@@ -10,9 +10,10 @@ import { TTCIcon } from './TTCIcon';
 
 interface SkillsListProps {
   onRequestSkill: () => void;
+  onTrySkill?: (skill: MCPSkill) => void;
 }
 
-export function SkillsList({ onRequestSkill }: SkillsListProps): React.ReactElement {
+export function SkillsList({ onRequestSkill, onTrySkill }: SkillsListProps): React.ReactElement {
   const [skills, setSkills] = useState<MCPSkill[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -70,7 +71,7 @@ export function SkillsList({ onRequestSkill }: SkillsListProps): React.ReactElem
         )}
 
         {skills.map((skill) => (
-          <SkillCard key={skill.name} skill={skill} />
+          <SkillCard key={skill.name} skill={skill} onTrySkill={onTrySkill} />
         ))}
       </div>
     </div>
@@ -79,10 +80,33 @@ export function SkillsList({ onRequestSkill }: SkillsListProps): React.ReactElem
 
 interface SkillCardProps {
   skill: MCPSkill;
+  onTrySkill?: (skill: MCPSkill) => void;
 }
 
-function SkillCard({ skill }: SkillCardProps): React.ReactElement {
+function SkillCard({ skill, onTrySkill }: SkillCardProps): React.ReactElement {
   const [isExpanded, setIsExpanded] = useState(false);
+
+  const handleTrySkill = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onTrySkill?.(skill);
+  };
+
+  // Parse schema to get human-readable parameters
+  const getSchemaParams = () => {
+    const schema = skill.inputSchema as { 
+      properties?: Record<string, { type?: string; description?: string }>;
+      required?: string[];
+    };
+    if (!schema.properties) return [];
+    return Object.entries(schema.properties).map(([key, val]) => ({
+      name: key,
+      type: val.type || 'any',
+      description: val.description,
+      required: schema.required?.includes(key) || false,
+    }));
+  };
+
+  const params = getSchemaParams();
 
   return (
     <div className="skill-card">
@@ -102,10 +126,28 @@ function SkillCard({ skill }: SkillCardProps): React.ReactElement {
 
       {isExpanded && (
         <div className="skill-card-details">
-          <div className="schema-label">Input Schema:</div>
-          <pre className="schema-code">
-            {JSON.stringify(skill.inputSchema, null, 2)}
-          </pre>
+          {params.length > 0 && (
+            <div className="schema-params">
+              <div className="schema-label">Parameters:</div>
+              <ul className="params-list">
+                {params.map((param) => (
+                  <li key={param.name} className="param-item">
+                    <span className="param-name">{param.name}</span>
+                    <span className="param-type">{param.type}</span>
+                    {param.required && <span className="param-required">required</span>}
+                    {param.description && (
+                      <span className="param-description">{param.description}</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {onTrySkill && (
+            <button className="try-skill-button" onClick={handleTrySkill}>
+              Try this skill
+            </button>
+          )}
         </div>
       )}
     </div>

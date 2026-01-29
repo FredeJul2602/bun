@@ -10,12 +10,18 @@
     "dev:client": "bun build src/client/index.tsx --outdir dist/client --watch",
     "build": "bun build src/client/index.tsx --outdir dist/client --minify && cp public/index.html dist/client/index.html",
     "start": "bun run src/server/index.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:push": "drizzle-kit push",
+    "db:pull": "drizzle-kit pull",
+    "db:studio": "drizzle-kit studio"
   },
   "devDependencies": {
     "@types/bun": "latest",
     "@types/react": "^19.2.9",
-    "@types/react-dom": "^19.2.3"
+    "@types/react-dom": "^19.2.3",
+    "drizzle-kit": "^0.31.8"
   },
   "peerDependencies": {
     "typescript": "^5"
@@ -24,8 +30,12 @@
     "@elysiajs/cors": "^1.4.1",
     "@elysiajs/static": "^1.4.7",
     "@modelcontextprotocol/sdk": "^1.25.3",
+    "@sentry/bun": "^10.37.0",
+    "drizzle-orm": "^0.45.1",
     "elysia": "^1.4.22",
+    "elysia-rate-limit": "^4.4.2",
     "openai": "^6.16.0",
+    "postgres": "^3.4.8",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "resend": "^6.8.0"

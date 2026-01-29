@@ -6,13 +6,38 @@
 import { Elysia, t } from 'elysia';
 import { cors } from '@elysiajs/cors';
 import { staticPlugin } from '@elysiajs/static';
+import { rateLimit } from 'elysia-rate-limit';
 import { mcpManager } from '../mcp/MCPManager';
 import { ChatService } from '../services/ChatService';
 import { emailService } from '../services/EmailService';
+import { captureError } from './sentry';
 import type { ChatRequest, SkillRequestFormData } from '../types';
 
+// WebSocket connection management
+const wsConnections = new Map<string, { send: (data: unknown) => void; conversationId?: string }>();
+
 // Initialize services with dependency injection
-const chatService = new ChatService(mcpManager);
+const chatService = new ChatService(mcpManager, {
+  // Callback to push messages via WebSocket when ready
+  onMessageComplete: (requestId, message) => {
+    for (const [connId, conn] of wsConnections) {
+      conn.send({
+        type: 'message_complete',
+        requestId,
+        message,
+      });
+    }
+  },
+  onMessageError: (requestId, error) => {
+    for (const [connId, conn] of wsConnections) {
+      conn.send({
+        type: 'message_error',
+        requestId,
+        error,
+      });
+    }
+  },
+});
 
 // Create Elysia app
 const app = new Elysia()
@@ -20,6 +45,11 @@ const app = new Elysia()
   .use(staticPlugin({
     assets: 'dist/client',
     prefix: '/',
+  }))
+  // Global rate limit: 100 requests per minute per IP
+  .use(rateLimit({
+    max: 100,
+    duration: 60_000,
   }))
   
   // Health check endpoint
@@ -43,6 +73,7 @@ const app = new Elysia()
   })
 
   // Submit chat message (returns request ID for polling)
+  // Rate limited: 20 requests per minute per IP
   .post('/api/chat', async ({ body }) => {
     try {
       const { message, conversationId } = body as ChatRequest;
@@ -60,6 +91,7 @@ const app = new Elysia()
         conversationId: convId,
       };
     } catch (error) {
+      captureError(error instanceof Error ? error : new Error(String(error)), { context: 'chat_endpoint' });
       return { 
         success: false, 
         error: error instanceof Error ? error.message : 'Failed to process message' 
@@ -98,6 +130,7 @@ const app = new Elysia()
   })
 
   // Submit skill request (sends email)
+  // Rate limited: 5 requests per hour per IP
   .post('/api/skill-request', async ({ body }) => {
     try {
       const data = body as SkillRequestFormData;
@@ -120,6 +153,7 @@ const app = new Elysia()
           : 'Failed to send request',
       };
     } catch (error) {
+      captureError(error instanceof Error ? error : new Error(String(error)), { context: 'skill_request_endpoint' });
       return { 
         success: false, 
         error: error instanceof Error ? error.message : 'Failed to submit request' 
@@ -143,6 +177,72 @@ const app = new Elysia()
     }),
   })
 
+  // ============================================
+  // WebSocket endpoint for real-time chat
+  // ============================================
+  .ws('/ws/chat', {
+    body: t.Object({
+      type: t.Union([t.Literal('message'), t.Literal('ping')]),
+      message: t.Optional(t.String()),
+      conversationId: t.Optional(t.String()),
+    }),
+    
+    open(ws) {
+      const connId = `ws_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+      (ws.data.store as Record<string, string>).connId = connId;
+      wsConnections.set(connId, {
+        send: (data) => ws.send(JSON.stringify(data)),
+      });
+      console.log(`[WS] Client connected: ${connId}`);
+      ws.send(JSON.stringify({ type: 'connected', connId }));
+    },
+
+    async message(ws, data) {
+      const connId = (ws.data.store as Record<string, string>).connId ?? '';
+      
+      if (data.type === 'ping') {
+        ws.send(JSON.stringify({ type: 'pong' }));
+        return;
+      }
+
+      if (data.type === 'message' && data.message) {
+        try {
+          const convId = data.conversationId || `conv_${Date.now()}`;
+          const requestId = await chatService.processMessage(convId, data.message);
+          
+          // Update connection with conversation ID
+          if (connId) {
+            const conn = wsConnections.get(connId);
+            if (conn) {
+              conn.conversationId = convId;
+            }
+          }
+
+          // Send acknowledgment
+          ws.send(JSON.stringify({
+            type: 'message_received',
+            requestId,
+            conversationId: convId,
+          }));
+        } catch (error) {
+          captureError(error instanceof Error ? error : new Error(String(error)), { context: 'ws_message' });
+          ws.send(JSON.stringify({
+            type: 'error',
+            error: error instanceof Error ? error.message : 'Failed to process message',
+          }));
+        }
+      }
+    },
+
+    close(ws) {
+      const connId = (ws.data.store as Record<string, string>)?.connId;
+      if (connId) {
+        wsConnections.delete(connId);
+        console.log(`[WS] Client disconnected: ${connId}`);
+      }
+    },
+  })
+
   // Serve index.html for client-side routing
   .get('/', () => Bun.file('dist/client/index.html'))
   .get('/*', async ({ path }) => {
@@ -152,4 +252,4 @@ const app = new Elysia()
     return exists ? file : Bun.file('dist/client/index.html');
   });
 
-export { app };
+export { app, wsConnections };

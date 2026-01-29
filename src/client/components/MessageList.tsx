@@ -10,9 +10,17 @@ import { TTCIcon, TTCIconLight } from './TTCIcon';
 interface MessageListProps {
   messages: ChatMessage[];
   isLoading: boolean;
+  onSuggestionClick?: (suggestion: string) => void;
 }
 
-export function MessageList({ messages, isLoading }: MessageListProps): React.ReactElement {
+const SUGGESTED_PROMPTS = [
+  'What skills are available?',
+  'Help me get started',
+  'Send an email to someone',
+  'What can you do?',
+];
+
+export function MessageList({ messages, isLoading, onSuggestionClick }: MessageListProps): React.ReactElement {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to bottom on new messages
@@ -27,6 +35,20 @@ export function MessageList({ messages, isLoading }: MessageListProps): React.Re
           <TTCIcon size={64} className="empty-icon-svg" />
           <h3>Start a conversation</h3>
           <p>Ask a question or request help with a task. The AI assistant can use Claude Skills to help you.</p>
+          
+          {onSuggestionClick && (
+            <div className="suggestion-chips">
+              {SUGGESTED_PROMPTS.map((prompt) => (
+                <button
+                  key={prompt}
+                  className="suggestion-chip"
+                  onClick={() => onSuggestionClick(prompt)}
+                >
+                  {prompt}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     );
