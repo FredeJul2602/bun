@@ -1,0 +1,3 @@
+plan: .
+vars:
+  service: claude-skills-assistant

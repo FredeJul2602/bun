@@ -1,0 +1,45 @@
+scripts:
+  build:
+    description: Build the client application
+    actions:
+      - shell: /Users/frederikjuljorgensen/.bun/bin/bun run build
+
+  dev:
+    description: Start development server with hot reload
+    actions:
+      - shell: /Users/frederikjuljorgensen/.bun/bin/bun run dev
+
+  start:
+    description: Start the production server
+    actions:
+      - shell: /Users/frederikjuljorgensen/.bun/bin/bun run start
+
+  typecheck:
+    description: Run TypeScript type checking
+    actions:
+      - shell: /Users/frederikjuljorgensen/.bun/bin/bun run typecheck
+
+  install:
+    description: Install dependencies
+    actions:
+      - shell: /Users/frederikjuljorgensen/.bun/bin/bun install
+
+  db-generate:
+    description: Generate database migrations
+    actions:
+      - shell: /Users/frederikjuljorgensen/.bun/bin/bun run db:generate
+
+  db-migrate:
+    description: Run database migrations
+    actions:
+      - shell: /Users/frederikjuljorgensen/.bun/bin/bun run db:migrate
+
+  db-push:
+    description: Push schema changes to database
+    actions:
+      - shell: /Users/frederikjuljorgensen/.bun/bin/bun run db:push
+
+  db-studio:
+    description: Open Drizzle Studio for database management
+    actions:
+      - shell: /Users/frederikjuljorgensen/.bun/bin/bun run db:studio
