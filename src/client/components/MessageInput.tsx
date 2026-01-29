@@ -3,20 +3,23 @@
 // Single Responsibility: Handle user text input
 // ============================================
 
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useCallback, useRef, useEffect } from 'react';
 
 interface MessageInputProps {
+  value: string;
+  onChange: (value: string) => void;
   onSend: (message: string) => void;
   disabled?: boolean;
   placeholder?: string;
 }
 
 export function MessageInput({ 
+  value,
+  onChange,
   onSend, 
   disabled = false,
   placeholder = 'Type your message...',
 }: MessageInputProps): React.ReactElement {
-  const [value, setValue] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Auto-resize textarea
@@ -28,13 +31,20 @@ export function MessageInput({
     }
   }, [value]);
 
+  // Focus textarea when value changes externally (e.g., suggestion click)
+  useEffect(() => {
+    if (value && textareaRef.current) {
+      textareaRef.current.focus();
+    }
+  }, [value]);
+
   const handleSubmit = useCallback(() => {
     const trimmed = value.trim();
     if (trimmed && !disabled) {
       onSend(trimmed);
-      setValue('');
+      onChange('');
     }
-  }, [value, disabled, onSend]);
+  }, [value, disabled, onSend, onChange]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -49,7 +59,7 @@ export function MessageInput({
         <textarea
           ref={textareaRef}
           value={value}
-          onChange={(e) => setValue(e.target.value)}
+          onChange={(e) => onChange(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
           disabled={disabled}
